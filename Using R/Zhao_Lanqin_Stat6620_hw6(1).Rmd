@@ -1,0 +1,122 @@
+---
+title: "STAT 6620 HW#6"
+author: "Lanqin Zhao,   NetID: ae8275"
+output: html_notebook
+---
+
+### Identifying launch distress using Logistic regression
+
+## Step 1 - collecting data ----
+We will utilize challenger.csv file. It includes 23 examples and 4 variables. The variables are:
+distress_ct        
+temperature
+field_check_pressure 
+flight_num  
+
+## Step 2: Exploring and preparing the data ----
+Explore the data to see whether we can use the data to Identify launch distress and prepare the data for modeling.
+
+# Import data
+```{r}
+launch <- read.csv("http://www.sci.csueastbay.edu/~esuess/classes/Statistics_6620/Presentations/ml10/challenger.csv")
+# examine the launch data
+str(launch)
+```
+# Prepare response variable
+First recode the distress_ct variable into 0 and 1, making 1 to represent at least one failure during a launch.
+```{r}
+launch$distress_ct = ifelse(launch$distress_ct<1,0,1)
+launch$distress_ct
+```
+# Check if there are any missing values
+
+```{r}
+
+library(Amelia)
+missmap(launch, main = "Missing values vs observed")
+
+```
+```{r}
+# number of missing values in each column
+
+sapply(launch,function(x) sum(is.na(x)))
+
+# number of unique values in each column
+
+sapply(launch, function(x) length(unique(x)))
+
+```
+
+# Prepare trainning and test data sets
+```{r}
+indx = sample(1:nrow(launch), as.integer(0.9*nrow(launch)))
+indx
+
+launch_train = launch[indx,]
+launch_test = launch[-indx,]
+launch_train_labels = launch[indx,1]
+launch_test_labels = launch[-indx,1]   
+```
+
+## Step 3: Training a model on the data ----
+
+```{r}
+# fit the logistic regression model, with all predictor variables
+
+model <- glm(distress_ct ~.,family=binomial(link='logit'),data=launch_train)
+model
+
+summary(model)
+
+anova(model, test="Chisq")
+
+```
+# drop the insignificant predictors, alpha = 0.10
+```{r}
+
+
+model <- glm(distress_ct ~ temperature,family=binomial(link='logit'),data=launch_train)
+model
+
+summary(model)
+
+anova(model, test="Chisq")
+ 
+```
+
+## Step 4: Evaluating model performance ----
+Use confusion matrix, accuracy  and ROC to evaluate model performance. The accuracy is 66.7%, which is poor. 
+
+```{r}
+# predictions on test data
+fitted.results <- predict(model,newdata=launch_test,type='response')
+fitted.results <- ifelse(fitted.results > 0.5,1,0)
+
+# Confusion Matrix
+library(gmodels)
+CrossTable(launch_test_labels, fitted.results ,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual distress', 'predicted distress'))
+
+# compute accuracy
+ClasificError <- mean(fitted.results == launch_test$distress_ct)
+print(paste('Accuracy',ClasificError))
+
+
+
+```
+```{r}
+# ROC
+
+library(ROCR)
+pr <- prediction(fitted.results , launch_test_labels)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+## Step 5: Improving model performance ----
+The possible way to improve model performance might be getting more of the number of examples and feature variables.

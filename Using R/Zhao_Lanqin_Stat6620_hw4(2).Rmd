@@ -1,0 +1,157 @@
+---
+title: "STAT 6620 HW#4"
+author: "Lanqin Zhao,   NetID: ae8275"
+output: html_notebook
+---
+
+### identifying poisonous mushrooms with rule learners
+
+## Step 1 - collecting data ----
+we will utilize the Mushroom dataset by Jeff Schlimmer of Carnegie Mellon University. The raw dataset is available freely at the UCI Machine Learning Repository (http://archive.ics.uci.edu/ml).
+The dataset includes information on 8,124 mushroom samples from 23 species of
+gilled mushrooms listed in Audubon Society Field Guide to North American Mushrooms
+(1981).The data dictionary available on the UCI website describes the 22 features of the mushroom samples, including characteristics such as cap shape, cap color, odor, gill size and color, stalk shape, and habitat. The target class, type, has two levels: edible, poisonous.
+
+## Step 2: Exploring and preparing the data ----
+Explore the data to see whether we can use the data to classify and prepare the data for modeling.
+# Import and explore data
+
+```{r}
+#Import the CSV file.
+mushrooms <- read.csv("mushrooms.csv")
+# examine the structure of the data frame
+str(mushrooms)
+
+```
+
+```{r}
+# drop the veil_type feature
+mushrooms$veil_type <- NULL
+```
+
+look at the class variable. About 52 percent of the mushroom samples (N = 4,208) are edible, while 48 percent (N = 3,916) are poisonous.
+```{r}
+# examine the class distribution
+table(mushrooms$type)
+```
+# Data preparation - creating training and test datasets
+Create training and test data to build models.
+
+```{r}
+# create a random sample for training and test data
+set.seed(123)
+train_sample <- sample(8124, 7000)
+str(train_sample)
+```
+split the data frames to training and test data
+
+```{r}
+# split the data frames 
+mushrooms_train <- mushrooms[train_sample, ]
+mushrooms_test  <- mushrooms[-train_sample, ]
+```
+check the proportion of class variable in training and test datasets. They are close, this appears to be a fairly even split.
+```{r}
+# check the proportion of class variable
+prop.table(table(mushrooms_train$type))
+prop.table(table(mushrooms_test$type))
+```
+
+## Step 3: Training a model on the data ----
+This time, we train a oneR model on the data. 
+```{r}
+install.packages("RWeka")
+library(RWeka)
+# train OneR() on the data
+mushroom_1R <- OneR(type ~ ., data = mushrooms_train)
+# display the rule the oneR generated
+mushroom_1R
+
+```
+```{r}
+# display detailed information about the oneRule model
+summary(mushroom_1R)
+```
+
+## Step 4: Evaluating model performance ----
+Create the cross tabulation of predicted vs. actual to evaluating model performance. From the below confusion matrix, the accuracy is 98.7%, which is excellent. 
+
+```{r}
+# predictions on test data
+mushroom_pred <- predict(mushroom_1R, mushrooms_test)
+
+# cross tabulation of predicted versus actual classes
+library(gmodels)
+CrossTable(mushrooms_test$type, mushroom_pred,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+```
+
+## Step 5: Improving model performance ----
+We will use two more sophisticated rule learners to improve performance.
+one is the RIPPER algorithm, and another is C5.0 decision tree.
+
+# RIPPER algorithm
+From the below confusion matrix, the accuracy is 100%, which is higher than previous 98.7% the oneR performed. 
+
+```{r}
+#train RIPPER on the data
+mushroom_JRip <- JRip(type ~ ., data = mushrooms_train)
+# display the rules the RIPPER model generated
+mushroom_JRip
+
+```
+```{r}
+# display detailed information about the RIPPER model
+summary(mushroom_JRip)
+```
+```{r}
+# predictions on test data
+mushroom_pred <- predict(mushroom_JRip, mushrooms_test)
+
+# cross tabulation of predicted versus actual classes
+library(gmodels)
+CrossTable(mushrooms_test$type, mushroom_pred,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+```
+# C5.0 decision tree algorithm
+From the below model summary results, C5.0 decision tree generated the same rule as the oneR algorithm did. Therefore, same confusion matrix, and the same accuracy, 98.7%. 
+
+```{r}
+#train C5.0 decision trees on the data
+library(C50)
+mushroom_c5rules <- C5.0(type ~ odor + gill_size, data = mushrooms_train, rules = TRUE)
+# display the rules the C5.0  model generated
+mushroom_c5rules
+
+```
+```{r}
+# display detailed information about the C5.0 model
+summary(mushroom_c5rules)
+```
+```{r}
+# predictions on test data
+mushroom_pred <- predict(mushroom_c5rules, mushrooms_test)
+
+# cross tabulation of predicted versus actual classes
+library(gmodels)
+CrossTable(mushrooms_test$type, mushroom_pred,
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
